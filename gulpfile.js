@@ -16,7 +16,7 @@ var rename = require('gulp-rename');
         presets: ['es2015']
       }))
       .pipe(rename(function(path) {
-        path.dirname += '/compiled';
+        path.dirname = 'compiled/' + path.dirname;
         return path;
       }))
       .pipe(gulp.dest('.'))
@@ -27,17 +27,6 @@ var rename = require('gulp-rename');
 (function() {
   var less = require('gulp-less');
   var autoprefixer = require('gulp-autoprefixer');
-  var csscomb = require('gulp-csscomb');
-
-  gulp.task('csscomb', function() {
-    return gulp.src(['visualizations/*/graph.css.less'])
-      .pipe(csscomb())
-      .pipe(rename(function(path) {
-        path.dirname += '/compiled';
-        return path;
-      }))
-      .pipe(gulp.dest('.'));
-  });
 
   gulp.task('less', function() {
     return gulp.src('visualizations/*/graph.css.less')
@@ -49,7 +38,7 @@ var rename = require('gulp-rename');
       .on('error', gutil.log.bind(gutil, 'Autoprefixer Error'))
       .pipe(rename({ extname: '' })) // Change .css.css to .css.
       .pipe(rename(function(path) {
-        path.dirname += '/compiled';
+        path.dirname = 'compiled/' + path.dirname;
         return path;
       }))
       .pipe(gulp.dest('.'))
@@ -62,7 +51,7 @@ var rename = require('gulp-rename');
   const eslint = require('gulp-eslint');
   gulp.task('eslint', function() {
     return gulp.src(['visualizations/*/graph.js'])
-      .pipe(eslint())
+      .pipe(eslint({ configFile: '.eslintrc.json' }))
       .pipe(eslint.format());
   });
 })();
@@ -80,13 +69,24 @@ var rename = require('gulp-rename');
   }
 
   gulp.task('html', function() {
-    const tasks = getFolders('.').map(function(f) {
+    const tasks = getFolders('compiled').map(function(f) {
       return gulp.src('template.html')
-      .pipe(rename('graph.html'))
-      .pipe(gulp.dest(f + '/compiled'));
+        .pipe(rename('graph.html'))
+        .pipe(gulp.dest('compiled/' + f));
     });
 
     return merge(tasks);
+  });
+})();
+
+(function() {
+  gulp.task('data', function() {
+    return gulp.src('visualizations/*/*.{csv,tsv,json}')
+    .pipe(rename(function(path) {
+      path.dirname = 'compiled/' + path.dirname;
+      return path;
+    }))
+    .pipe(gulp.dest('.'));
   });
 })();
 
@@ -94,11 +94,27 @@ gulp.task('watch', function() {
   gulp.watch('visualizations/*/graph.css.less', ['less']);
   gulp.watch('visualizations/*/graph.js', ['eslint']);
   gulp.watch('visualizations/*/graph.js', ['js']);
+  gulp.watch('visualizations/*/*.{csv,tsv,json}', ['data']);
   livereload.listen(35731);
+});
+
+gulp.task('serve', function() {
+  var connect = require('connect');
+  var serveStatic = require('serve-static');
+  var serveIndex = require('serve-index');
+
+  var app = connect();
+
+  app
+    .use(serveStatic('compiled'))
+    .use(serveIndex('compiled'));
+
+  app.listen(3500);
 });
 
 gulp.task('default', [
   'js',
   'html',
-  'less'
+  'less',
+  'data'
 ]);
